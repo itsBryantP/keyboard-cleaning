@@ -72,7 +72,9 @@ public enum Intent: Equatable, Sendable {
 /// `LockEnforcement`, which the watchdog touches off-main (REV-1).
 @MainActor
 public final class LockStateMachine: ObservableObject {
-    @Published public private(set) var state: LockState
+    @Published public private(set) var state: LockState {
+        didSet { enforcement.isUnlockedMirror = state.isUnlocked }
+    }
 
     /// Constants (FSM-1, REV-3).
     private let drainDuration: TimeInterval = 0.25
@@ -119,6 +121,9 @@ public final class LockStateMachine: ObservableObject {
         // back in as intents.
         tap.onUnlockHotkey = { [weak self] in self?.handle(.unlockRequestedByHotkey) }
         tap.onTapInterrupted = { [weak self] in self?.handle(.tapInterrupted) }
+
+        // didSet doesn't fire for the initial assignment above.
+        enforcement.isUnlockedMirror = state.isUnlocked
     }
 
     /// Mirror used by the REV-9 binding-update guard.

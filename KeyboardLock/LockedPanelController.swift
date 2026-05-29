@@ -13,11 +13,11 @@ import KeyboardLockCore
 @MainActor
 final class LockedPanelController {
     private let stateMachine: LockStateMachine
-    private let preferences: StaticPreferences
+    private let preferences: PreferencesStore
     private let enforcement: LockEnforcement
     private var panel: NSPanel?
 
-    init(stateMachine: LockStateMachine, preferences: StaticPreferences, enforcement: LockEnforcement) {
+    init(stateMachine: LockStateMachine, preferences: PreferencesStore, enforcement: LockEnforcement) {
         self.stateMachine = stateMachine
         self.preferences = preferences
         self.enforcement = enforcement

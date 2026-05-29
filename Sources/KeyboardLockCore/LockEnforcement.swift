@@ -27,6 +27,10 @@ public final class LockEnforcement: @unchecked Sendable {
         /// TAP-5: consecutive `tapDisabledByTimeout` events; the controller
         /// gives up if this trips its cap.
         var consecutiveTapTimeouts: Int = 0
+        /// REV-9 / TAP-6: thread-safe mirror of "the UI state machine is in the
+        /// unlocked family", so the controller's binding-update subscription can
+        /// reject a mid-lock binding change off the main thread.
+        var unlocked: Bool = true
     }
 
     private let state: OSAllocatedUnfairLock<State>
@@ -70,6 +74,14 @@ public final class LockEnforcement: @unchecked Sendable {
 
     public var consecutiveTapTimeouts: Int {
         state.withLock { $0.consecutiveTapTimeouts }
+    }
+
+    /// Mirror of `LockStateMachine.isUnlocked` (REV-9). The state machine writes
+    /// it on every transition; the controller reads it off-main to gate binding
+    /// changes.
+    public var isUnlockedMirror: Bool {
+        get { state.withLock { $0.unlocked } }
+        set { state.withLock { $0.unlocked = newValue } }
     }
 
     // MARK: - Tap-timeout bookkeeping (TAP-5)

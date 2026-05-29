@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import CoreGraphics
 import KeyboardLockCore
 import os
@@ -33,8 +34,38 @@ final class LockController: LockTapControlling {
     private let installResult = DispatchSemaphore(value: 0)
     private var installSucceeded = false
 
+    /// REV-9: binding updates are delivered on a dedicated serial queue, never
+    /// on the tap's hot path.
+    private let bindingQueue = DispatchQueue(label: "com.itsbryantp.keyboardlock.binding")
+    private var bindingCancellable: AnyCancellable?
+
     init(enforcement: LockEnforcement) {
         self.enforcement = enforcement
+    }
+
+    // MARK: - Preference binding (TAP-6 / REV-9)
+
+    /// Subscribe to unlock-hotkey changes. The single direction is
+    /// `Prefs → (Combine) → LockController → LockEnforcement`; `PreferencesStore`
+    /// never references the controller.
+    @MainActor
+    func bindUnlockHotkey(from preferences: PreferencesStore) {
+        enforcement.binding = preferences.unlockHotkey // initial value, synchronously
+        bindingCancellable = preferences.$unlockHotkey
+            .receive(on: bindingQueue)
+            .sink { [weak self] binding in self?.applyBindingIfUnlocked(binding) }
+    }
+
+    private func applyBindingIfUnlocked(_ binding: HotkeyBinding) {
+        // FR-8a: a binding change must never land mid-lock. The recorder is only
+        // interactive while unlocked, so this guard is belt-and-suspenders.
+        guard enforcement.isUnlockedMirror else {
+            #if DEBUG
+            assertionFailure("Unlock hotkey changed while not unlocked (FR-8a)")
+            #endif
+            return
+        }
+        enforcement.binding = binding
     }
 
     // MARK: - Install / remove (main thread)

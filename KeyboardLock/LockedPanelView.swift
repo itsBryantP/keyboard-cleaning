@@ -6,7 +6,7 @@ import KeyboardLockCore
 /// from the 60 Hz `HoldButtonModel`, not from per-tick state churn.
 struct LockedPanelView: View {
     @ObservedObject var stateMachine: LockStateMachine
-    let preferences: StaticPreferences
+    @ObservedObject var preferences: PreferencesStore
     let enforcement: LockEnforcement
 
     @StateObject private var holdModel = HoldButtonModel()

@@ -7,7 +7,7 @@ import KeyboardLockCore
 struct RootView: View {
     @ObservedObject var stateMachine: LockStateMachine
     @ObservedObject var permissions: PermissionsService
-    let preferences: StaticPreferences
+    @ObservedObject var preferences: PreferencesStore
 
     var body: some View {
         content

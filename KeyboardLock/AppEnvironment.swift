@@ -1,24 +1,16 @@
 import AppKit
 import Combine
 import KeyboardLockCore
-
-/// Temporary preferences provider for Phases 8–10. Replaced by the real
-/// UserDefaults-backed `PreferencesStore` (DATA-1) + Settings UI + recorder in
-/// Phase 11. Defaults match D-2 (3 s countdown) and D-4 (⌃⌥⌘L, hold).
-final class StaticPreferences: LockPreferencesProviding {
-    var countdownSeconds: Int = 3
-    var unlockMode: UnlockMode = .hold
-    var unlockHotkey: HotkeyBinding = .defaultUnlock
-}
+import ServiceManagement
 
 /// Assembles and wires the runtime object graph (ARCH-2/ARCH-5). App-lifetime
 /// root, held as a `@StateObject`. Owns enforcement, controller, power,
-/// watchdog, observers, permissions, the scheduler, and the state machine, and
-/// connects the cross-thread signals back onto the main actor.
+/// watchdog, observers, permissions, preferences, the scheduler, and the state
+/// machine, and connects the cross-thread signals back onto the main actor.
 @MainActor
 final class AppEnvironment: ObservableObject {
     let enforcement: LockEnforcement
-    let preferences: StaticPreferences
+    let preferences: PreferencesStore
     let permissions: PermissionsService
     let controller: LockController
     let power: PowerManager
@@ -33,8 +25,8 @@ final class AppEnvironment: ObservableObject {
     private var forcedUnlockObserver: NSObjectProtocol?
 
     init() {
-        let enforcement = LockEnforcement(binding: .defaultUnlock)
-        let preferences = StaticPreferences()
+        let preferences = PreferencesStore()
+        let enforcement = LockEnforcement(binding: preferences.unlockHotkey)
         let permissions = PermissionsService()
         let controller = LockController(enforcement: enforcement)
         let power = PowerManager(enforcement: enforcement)
@@ -71,12 +63,14 @@ final class AppEnvironment: ObservableObject {
             enforcement: enforcement
         )
 
+        // REV-9: controller subscribes to unlock-hotkey changes.
+        controller.bindUnlockHotkey(from: preferences)
+        createMenuBar()
         wireUp()
-        installMenuBar()
     }
 
-    private func installMenuBar() {
-        let menuBar = MenuBarController(
+    private func createMenuBar() {
+        menuBar = MenuBarController(
             enforcement: enforcement,
             stateMachine: stateMachine,
             onShowMainWindow: {
@@ -84,13 +78,11 @@ final class AppEnvironment: ObservableObject {
                 NSApp.windows.first { $0.canBecomeMain }?.makeKeyAndOrderFront(nil)
             },
             onOpenPreferences: {
-                // Becomes functional with the Settings scene in Phase 11.
                 NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
             },
             onUnlockViaPanel: { [panelController] in panelController.surfaceForUnlock() }
         )
-        menuBar.install()
-        self.menuBar = menuBar
+        // install / remove is driven by the showMenuBarItem preference (REV-14).
     }
 
     private func wireUp() {
@@ -123,6 +115,26 @@ final class AppEnvironment: ObservableObject {
                 }
                 // Immediate icon refresh so there's no 250 ms lag (REV-11).
                 self?.menuBar?.refresh()
+            }
+            .store(in: &cancellables)
+
+        // REV-14: show / hide the menu bar item per preference.
+        preferences.$showMenuBarItem
+            .sink { [weak self] show in
+                if show { self?.menuBar?.install() } else { self?.menuBar?.remove() }
+            }
+            .store(in: &cancellables)
+
+        // Launch at login via SMAppService (PRD §5.7). Fires with the current
+        // value on subscribe, so registration tracks the stored preference.
+        preferences.$launchAtLogin
+            .sink { enabled in
+                do {
+                    if enabled { try SMAppService.mainApp.register() }
+                    else { try SMAppService.mainApp.unregister() }
+                } catch {
+                    NSLog("KeyboardLock: launch-at-login update failed: \(error)")
+                }
             }
             .store(in: &cancellables)
 

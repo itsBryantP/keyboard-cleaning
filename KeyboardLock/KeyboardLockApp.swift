@@ -17,5 +17,9 @@ struct KeyboardLockApp: App {
             )
         }
         .windowResizability(.contentSize)
+
+        Settings {
+            SettingsView(preferences: env.preferences, stateMachine: env.stateMachine)
+        }
     }
 }
