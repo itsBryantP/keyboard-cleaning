@@ -110,18 +110,7 @@ struct LockedPanelView: View {
     }
 
     private var stuckSheet: some View {
-        // Minimal placeholder; full content (Force Quit steps, Secure Input
-        // note) lands in Phase 14 (UI-9).
-        VStack(spacing: 16) {
-            Text("App stopped responding?").font(.title2.bold())
-            Text("Open the Apple menu in the top-left with your mouse, choose Force Quit…, then select the frozen app. KeyboardLock’s keyboard lock does not block the mouse.")
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-            Button("Close") { showStuck = false }
-                .keyboardShortcut(.cancelAction)
-        }
-        .padding(28)
-        .frame(width: 360)
+        StuckSheetView { showStuck = false }
     }
 
     private func formatted(_ interval: TimeInterval) -> String {

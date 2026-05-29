@@ -37,6 +37,9 @@ struct UnlockedView: View {
     let hotkey: HotkeyBinding
     let onLock: () -> Void
 
+    @State private var secureInputActive = SecureInput.isActive
+    private let secureInputTicker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
     var body: some View {
         VStack(spacing: 18) {
             VStack(spacing: 6) {
@@ -71,9 +74,22 @@ struct UnlockedView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
+
+            // L-1 / UI-9: warn (don't block) when Secure Input is active.
+            if secureInputActive {
+                Label(
+                    "A password prompt is using Secure Input. Some keystrokes may pass through. Close the prompt and try again.",
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(24)
         .frame(width: 420, height: 320)
+        .onReceive(secureInputTicker) { _ in secureInputActive = SecureInput.isActive }
     }
 }
 
