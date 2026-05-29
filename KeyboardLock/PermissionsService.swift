@@ -97,6 +97,9 @@ final class PermissionsService: ObservableObject {
     /// check (ARCH-1) hands off; the relaunch-handoff marker (REV-NEW-1) is
     /// wired in the single-instance phase. No launch agent is needed.
     func restartNow() {
+        // REV-NEW-1: mark the handoff so the fresh instance survives the
+        // single-instance check while this one is still alive.
+        SingleInstanceCoordinator.beginRelaunchHandoff()
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.createsNewApplicationInstance = true
         NSWorkspace.shared.openApplication(
