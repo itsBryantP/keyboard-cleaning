@@ -27,6 +27,7 @@ final class AppEnvironment: ObservableObject {
     let scheduler: MainQueueScheduler
     let stateMachine: LockStateMachine
 
+    private let panelController: LockedPanelController
     private var cancellables: Set<AnyCancellable> = []
     private var forcedUnlockObserver: NSObjectProtocol?
 
@@ -63,6 +64,11 @@ final class AppEnvironment: ObservableObject {
         self.observer = SystemEventObserver()
         self.scheduler = scheduler
         self.stateMachine = stateMachine
+        self.panelController = LockedPanelController(
+            stateMachine: stateMachine,
+            preferences: preferences,
+            enforcement: enforcement
+        )
 
         wireUp()
     }
@@ -85,6 +91,18 @@ final class AppEnvironment: ObservableObject {
         ) { [stateMachine] _ in
             MainActor.assumeIsolated { stateMachine.handle(.watchdogForcedUnlock) }
         }
+
+        // Show / hide the floating panel as we enter / leave the locked family
+        // (UI-3). The published value is the upcoming state.
+        stateMachine.$state
+            .sink { [weak self] state in
+                if state.isLockedFamily {
+                    self?.panelController.show()
+                } else {
+                    self?.panelController.hide()
+                }
+            }
+            .store(in: &cancellables)
 
         permissions.startMonitoring()
     }
