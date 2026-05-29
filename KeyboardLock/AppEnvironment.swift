@@ -1,0 +1,107 @@
+import AppKit
+import Combine
+import KeyboardLockCore
+
+/// Temporary preferences provider for Phases 8–10. Replaced by the real
+/// UserDefaults-backed `PreferencesStore` (DATA-1) + Settings UI + recorder in
+/// Phase 11. Defaults match D-2 (3 s countdown) and D-4 (⌃⌥⌘L, hold).
+final class StaticPreferences: LockPreferencesProviding {
+    var countdownSeconds: Int = 3
+    var unlockMode: UnlockMode = .hold
+    var unlockHotkey: HotkeyBinding = .defaultUnlock
+}
+
+/// Assembles and wires the runtime object graph (ARCH-2/ARCH-5). App-lifetime
+/// root, held as a `@StateObject`. Owns enforcement, controller, power,
+/// watchdog, observers, permissions, the scheduler, and the state machine, and
+/// connects the cross-thread signals back onto the main actor.
+@MainActor
+final class AppEnvironment: ObservableObject {
+    let enforcement: LockEnforcement
+    let preferences: StaticPreferences
+    let permissions: PermissionsService
+    let controller: LockController
+    let power: PowerManager
+    let watchdog: Watchdog
+    let observer: SystemEventObserver
+    let scheduler: MainQueueScheduler
+    let stateMachine: LockStateMachine
+
+    private var cancellables: Set<AnyCancellable> = []
+    private var forcedUnlockObserver: NSObjectProtocol?
+
+    init() {
+        let enforcement = LockEnforcement(binding: .defaultUnlock)
+        let preferences = StaticPreferences()
+        let permissions = PermissionsService()
+        let controller = LockController(enforcement: enforcement)
+        let power = PowerManager(enforcement: enforcement)
+        let scheduler = MainQueueScheduler()
+
+        // Watchdog teardown runs off-main using only thread-safe calls (EDGE-1).
+        let watchdog = Watchdog(enforcement: enforcement, forceStop: { assertionID in
+            controller.forceStopFromWatchdog()
+            PowerManager.releaseAssertion(id: assertionID)
+        })
+
+        let stateMachine = LockStateMachine(
+            tap: controller,
+            power: power,
+            watchdog: watchdog,
+            preferences: preferences,
+            enforcement: enforcement,
+            scheduler: scheduler,
+            initialPermission: permissions.status
+        )
+
+        self.enforcement = enforcement
+        self.preferences = preferences
+        self.permissions = permissions
+        self.controller = controller
+        self.power = power
+        self.watchdog = watchdog
+        self.observer = SystemEventObserver()
+        self.scheduler = scheduler
+        self.stateMachine = stateMachine
+
+        wireUp()
+    }
+
+    private func wireUp() {
+        // Permission status → state machine (drives S0 ↔ S1 while unlocked).
+        permissions.$status
+            .sink { [stateMachine] status in stateMachine.handle(.permissionStatusChanged(status)) }
+            .store(in: &cancellables)
+
+        // Sleep / screen-lock → force unlock (EC-4 / EC-8); wake → backstop.
+        observer.onSleepOrScreenLock = { [stateMachine] in stateMachine.handle(.systemWillSleepOrLock) }
+        observer.onWake = { [weak self] in self?.handleWake() }
+        observer.start()
+
+        // Watchdog forced-unlock reconcile (REV-11): the watchdog posts off its
+        // queue; reconcile on the main actor.
+        forcedUnlockObserver = NotificationCenter.default.addObserver(
+            forName: .kbStateForcedUnlocked, object: nil, queue: .main
+        ) { [stateMachine] _ in
+            MainActor.assumeIsolated { stateMachine.handle(.watchdogForcedUnlock) }
+        }
+
+        permissions.startMonitoring()
+    }
+
+    /// REV-19 backstop: guarantee we come up unlocked on wake and that no tap
+    /// somehow survived sleep.
+    private func handleWake() {
+        stateMachine.handle(.systemWillSleepOrLock) // tears down if still locked
+        if enforcement.tapInstalled {
+            controller.forceStopFromWatchdog()
+            power.endAssertion()
+        }
+    }
+
+    deinit {
+        if let forcedUnlockObserver {
+            NotificationCenter.default.removeObserver(forcedUnlockObserver)
+        }
+    }
+}
