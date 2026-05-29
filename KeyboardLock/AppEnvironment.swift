@@ -28,6 +28,7 @@ final class AppEnvironment: ObservableObject {
     let stateMachine: LockStateMachine
 
     private let panelController: LockedPanelController
+    private var menuBar: MenuBarController?
     private var cancellables: Set<AnyCancellable> = []
     private var forcedUnlockObserver: NSObjectProtocol?
 
@@ -71,6 +72,25 @@ final class AppEnvironment: ObservableObject {
         )
 
         wireUp()
+        installMenuBar()
+    }
+
+    private func installMenuBar() {
+        let menuBar = MenuBarController(
+            enforcement: enforcement,
+            stateMachine: stateMachine,
+            onShowMainWindow: {
+                NSApp.activate(ignoringOtherApps: true)
+                NSApp.windows.first { $0.canBecomeMain }?.makeKeyAndOrderFront(nil)
+            },
+            onOpenPreferences: {
+                // Becomes functional with the Settings scene in Phase 11.
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            },
+            onUnlockViaPanel: { [panelController] in panelController.surfaceForUnlock() }
+        )
+        menuBar.install()
+        self.menuBar = menuBar
     }
 
     private func wireUp() {
@@ -101,6 +121,8 @@ final class AppEnvironment: ObservableObject {
                 } else {
                     self?.panelController.hide()
                 }
+                // Immediate icon refresh so there's no 250 ms lag (REV-11).
+                self?.menuBar?.refresh()
             }
             .store(in: &cancellables)
 
