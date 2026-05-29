@@ -11,7 +11,7 @@ import os
 /// `DispatchQueue.main.async` — never SwiftUI / `@Published` (ARCH-4). Lives in
 /// the app target (not the core package) because TAP-3 step 2 needs
 /// `NSEvent(cgEvent:)` to distinguish media-key `systemDefined` events.
-final class LockController {
+final class LockController: LockTapControlling {
     /// Tap thread → main signals. Set once before `installTap()`; the caller
     /// (LockStateMachine) marshals these onto the main actor.
     var onUnlockHotkey: (() -> Void)?
