@@ -14,6 +14,7 @@ struct LockedPanelView: View {
     @State private var elapsed: TimeInterval = 0
     @State private var rearming = false
     @State private var showStuck = false
+    @State private var increaseContrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
 
     // 0.25 s tick: updates the 1 s timer label and best-effort polls the
     // transient re-arming flag (REV-6).
@@ -46,10 +47,17 @@ struct LockedPanelView: View {
         }
         .padding(28)
         .frame(width: 480, height: 360)
-        .background(Color(red: 0.93, green: 0.20, blue: 0.20).opacity(0.10))
+        // AX-6: deepen the tint and add an explicit border under Increase Contrast.
+        .background(Color(red: 0.93, green: 0.20, blue: 0.20).opacity(increaseContrast ? 0.20 : 0.10))
+        .overlay {
+            if increaseContrast {
+                Rectangle().strokeBorder(Color(.systemRed), lineWidth: 1)
+            }
+        }
         .onReceive(ticker) { _ in
             elapsed = Date().timeIntervalSince(start)
             rearming = enforcement.rearming
+            increaseContrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
         }
         .onAppear { start = Date() }
         .sheet(isPresented: $showStuck) { stuckSheet }

@@ -136,9 +136,14 @@ struct HoldButton: NSViewRepresentable {
         let control = HoldButtonControl()
         control.model = model
         apply(to: control)
-        // Make the control accessible (AX-1) — full pass in Phase 13.
+        // AX-1 / AX-7: a labelled button element so VoiceOver describes it and
+        // Voice/Switch Control can target it. A single "Click" press-releases
+        // (cancels, staying locked); "Press and hold" completes — matching the
+        // FR-7 safeguard with no single-action unlock.
+        control.setAccessibilityElement(true)
         control.setAccessibilityRole(.button)
-        control.setAccessibilityLabel("Hold to unlock; press and hold for one and a half seconds.")
+        control.setAccessibilityLabel("Hold to unlock")
+        control.setAccessibilityHelp("Press and hold for one and a half seconds to unlock the keyboard.")
         return control
     }
 

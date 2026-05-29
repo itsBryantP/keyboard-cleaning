@@ -23,6 +23,7 @@ final class AppEnvironment: ObservableObject {
     private var menuBar: MenuBarController?
     private var cancellables: Set<AnyCancellable> = []
     private var forcedUnlockObserver: NSObjectProtocol?
+    private var lastAnnouncementKey: String?
 
     init() {
         let preferences = PreferencesStore()
@@ -115,6 +116,7 @@ final class AppEnvironment: ObservableObject {
                 }
                 // Immediate icon refresh so there's no 250 ms lag (REV-11).
                 self?.menuBar?.refresh()
+                self?.announceTransition(to: state)
             }
             .store(in: &cancellables)
 
@@ -139,6 +141,15 @@ final class AppEnvironment: ObservableObject {
             .store(in: &cancellables)
 
         permissions.startMonitoring()
+    }
+
+    /// AX-2: announce coarse transitions to VoiceOver, de-duplicated so the
+    /// per-tick countdown / hold progress don't spam.
+    private func announceTransition(to state: LockState) {
+        guard let (key, text) = AccessibilityAnnouncer.message(for: state) else { return }
+        guard key != lastAnnouncementKey else { return }
+        lastAnnouncementKey = key
+        AccessibilityAnnouncer.announce(text)
     }
 
     /// REV-19 backstop: guarantee we come up unlocked on wake and that no tap
