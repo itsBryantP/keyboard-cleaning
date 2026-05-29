@@ -56,4 +56,4 @@ The architecture is specified in `docs/SPEC.md` §2 (component table + Mermaid d
 
 ## Commits
 
-A `.claude/settings.local.json` pre-allows `git add *` and `git commit -m ' *`. Commits should still only be made when the user explicitly asks. Co-author trailer is `Claude Opus 4.7 (1M context) <noreply@anthropic.com>`.
+A `.claude/settings.local.json` pre-allows `git add *` and `git commit -m ' *`. Commits should still only be made when the user explicitly asks.
