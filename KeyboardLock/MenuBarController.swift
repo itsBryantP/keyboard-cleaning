@@ -112,6 +112,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(makeItem("Show Main Window", #selector(showMainWindow)))
         menu.addItem(makeItem("Preferences…", #selector(openPreferences)))
         menu.addItem(makeItem("About KeyboardLock", #selector(showAbout)))
+        menu.addItem(makeItem("Check for Updates…", #selector(checkForUpdates)))
 
         #if DEBUG
         menu.addItem(.separator())
@@ -144,6 +145,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         NSApp.activate(ignoringOtherApps: true)
         NSApp.orderFrontStandardAboutPanel(nil)
     }
+    @objc private func checkForUpdates() { UpdateChecker.openReleasesPage() }
     @objc private func quit() { NSApp.terminate(nil) }
 
     #if DEBUG

@@ -82,6 +82,7 @@ private struct AboutTab: View {
             Text(version).foregroundStyle(.secondary)
             Link("github.com/itsBryantP/keyboard-cleaning",
                  destination: URL(string: "https://github.com/itsBryantP/keyboard-cleaning")!)
+            Button("Check for Updates…") { UpdateChecker.openReleasesPage() }
             Button("Quit KeyboardLock") { NSApp.terminate(nil) }
         }
         .padding(20)
