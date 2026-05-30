@@ -2,7 +2,9 @@
 
 A small, single-purpose macOS utility that **locks your keyboard so you can clean it** without triggering anything. The mouse keeps working the whole time; you end the lock with a configurable hotkey (default **⌃⌥⌘L**) or an on-screen **hold-to-unlock** control.
 
-> **Status:** Implemented from [`docs/SPEC.md`](docs/SPEC.md) (v0.1.0, pre-release). Builds, unit-tested, and runnable locally. Not yet signed/notarized or published to GitHub Releases.
+> **Status:** v1.0.0 — first release, implemented from [`docs/SPEC.md`](docs/SPEC.md). Grab the `.dmg` from the [Releases page](https://github.com/itsBryantP/keyboard-cleaning/releases).
+>
+> ⚠️ The 1.0.0 build is **ad-hoc signed, not yet Apple-notarized** (no Developer ID is configured). Gatekeeper will warn on first launch — right-click the app → **Open** → **Open**, or run `xattr -dr com.apple.quarantine /Applications/KeyboardLock.app`. Notarized builds will follow once signing is set up (BUILD-3).
 
 ## Why
 
@@ -29,7 +31,11 @@ The app is **not sandboxed** (a sandboxed build can't install a HID event tap), 
 
 ## Install
 
-### From a local build (to try it now)
+### Download (recommended)
+
+Grab `KeyboardLock-1.0.0.dmg` from the [latest release](https://github.com/itsBryantP/keyboard-cleaning/releases/latest), open it, and drag **KeyboardLock** into Applications. Because this build isn't notarized yet, the first launch needs a Gatekeeper bypass: right-click the app → **Open** → **Open**. On first run the app guides you through granting **Accessibility** and **Input Monitoring**.
+
+### From a local build
 
 ```sh
 xcodebuild build -scheme KeyboardLock -configuration Release \
