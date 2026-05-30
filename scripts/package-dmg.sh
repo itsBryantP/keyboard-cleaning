@@ -23,7 +23,7 @@ ln -s /Applications "$STAGING/Applications"
 mkdir -p dist
 rm -f "$OUT"
 
-echo "==> Creating $OUT…"
+echo "==> Creating ${OUT}"
 hdiutil create \
   -volname "KeyboardLock" \
   -srcfolder "$STAGING" \
