@@ -1,4 +1,4 @@
-import AppKit
+import Foundation
 import Combine
 import CoreGraphics
 import KeyboardLockCore
@@ -159,14 +159,16 @@ final class LockController: LockTapControlling {
     /// Entry point from the C trampoline. Returns the event (passthrough), or
     /// nil to drop / consume.
     fileprivate func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
-        // systemDefined (NX_SYSDEFINED) is not a named CGEventType case (TAP-3
-        // step 2): match it by raw value and drop only media-key subtypes.
+        // systemDefined (NX_SYSDEFINED) is not a named CGEventType case. Drop
+        // them all while locked (media / brightness / aux keys). We deliberately
+        // do NOT build an NSEvent to classify the subtype: NSEvent(cgEvent:)
+        // calls into Text Input Sources (TSM), which asserts it must run on the
+        // main queue and crashes this tap thread (dispatch_assert_queue / SIGTRAP).
+        // Dropping every systemDefined event is safe and matches the intent of
+        // suppressing keyboard keys during cleaning (corrected TAP-3 step 2).
         if type.rawValue == TapConfiguration.systemDefinedEventTypeRawValue {
-            if isMediaKeySystemDefined(event) {
-                clearRearmOnCleanPass()
-                return nil // drop media / brightness keys while locked
-            }
-            return Unmanaged.passUnretained(event) // pass through other system events
+            clearRearmOnCleanPass()
+            return nil
         }
 
         switch type {
@@ -225,14 +227,6 @@ final class LockController: LockTapControlling {
     private func clearRearmOnCleanPass() {
         if enforcement.rearming { enforcement.rearming = false }
         if enforcement.consecutiveTapTimeouts != 0 { enforcement.resetTapTimeouts() }
-    }
-
-    private func isMediaKeySystemDefined(_ event: CGEvent) -> Bool {
-        guard let nsEvent = NSEvent(cgEvent: event), nsEvent.type == .systemDefined else {
-            return false
-        }
-        // subtype 8 == NX_SUBTYPE_AUX_CONTROL_BUTTONS (media / brightness keys).
-        return nsEvent.subtype.rawValue == 8
     }
 
     private func signalUnlock() {
